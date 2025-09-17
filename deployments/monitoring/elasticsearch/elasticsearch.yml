@@ -1,0 +1,43 @@
+# Elasticsearch 配置文件
+# Kong APIM Platform - Elasticsearch Configuration
+
+cluster.name: kong-apim-cluster
+node.name: elasticsearch-node-1
+
+# 網路設定
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# 節點設定
+node.roles: [ master, data, ingest ]
+
+# 記憶體設定
+bootstrap.memory_lock: true
+
+# 發現設定 (單節點模式)
+discovery.type: single-node
+
+# 安全性設定 (開發環境關閉)
+xpack.security.enabled: false
+xpack.security.enrollment.enabled: false
+xpack.security.http.ssl.enabled: false
+xpack.security.transport.ssl.enabled: false
+
+# 監控設定
+xpack.monitoring.collection.enabled: true
+
+# 日誌設定
+logger.level: INFO
+
+# 索引設定
+action.auto_create_index: "kong-api-logs-*,postgres-metrics-*"
+
+# 回收設定
+cluster.routing.allocation.disk.threshold_enabled: true
+cluster.routing.allocation.disk.watermark.low: 85%
+cluster.routing.allocation.disk.watermark.high: 90%
+cluster.routing.allocation.disk.watermark.flood_stage: 95%
+
+# 分片設定
+cluster.max_shards_per_node: 1000

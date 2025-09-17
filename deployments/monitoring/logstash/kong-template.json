@@ -1,0 +1,142 @@
+{
+  "index_patterns": ["kong-api-logs-*"],
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "index.refresh_interval": "5s",
+    "index.mapping.total_fields.limit": 2000
+  },
+  "mappings": {
+    "properties": {
+      "@timestamp": {
+        "type": "date"
+      },
+      "started_at": {
+        "type": "date"
+      },
+      "processed_at": {
+        "type": "date"
+      },
+      "http_method": {
+        "type": "keyword"
+      },
+      "http_status": {
+        "type": "integer"
+      },
+      "response_category": {
+        "type": "keyword"
+      },
+      "total_latency": {
+        "type": "integer"
+      },
+      "proxy_latency": {
+        "type": "integer"
+      },
+      "kong_latency": {
+        "type": "integer"
+      },
+      "service_name": {
+        "type": "keyword"
+      },
+      "route_name": {
+        "type": "keyword"
+      },
+      "client_address": {
+        "type": "ip"
+      },
+      "user_agent": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "request_size": {
+        "type": "integer"
+      },
+      "response_size": {
+        "type": "integer"
+      },
+      "request": {
+        "properties": {
+          "method": {
+            "type": "keyword"
+          },
+          "uri": {
+            "type": "keyword"
+          },
+          "url": {
+            "type": "keyword"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "querystring": {
+            "type": "object"
+          },
+          "headers": {
+            "type": "object"
+          }
+        }
+      },
+      "response": {
+        "properties": {
+          "status": {
+            "type": "integer"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "headers": {
+            "type": "object"
+          }
+        }
+      },
+      "service": {
+        "properties": {
+          "id": {
+            "type": "keyword"
+          },
+          "name": {
+            "type": "keyword"
+          }
+        }
+      },
+      "route": {
+        "properties": {
+          "id": {
+            "type": "keyword"
+          },
+          "name": {
+            "type": "keyword"
+          }
+        }
+      },
+      "consumer": {
+        "properties": {
+          "id": {
+            "type": "keyword"
+          },
+          "username": {
+            "type": "keyword"
+          }
+        }
+      },
+      "latencies": {
+        "properties": {
+          "request": {
+            "type": "integer"
+          },
+          "kong": {
+            "type": "integer"
+          },
+          "proxy": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

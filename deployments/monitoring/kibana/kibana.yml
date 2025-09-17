@@ -1,0 +1,44 @@
+# Kibana 配置文件
+# Kong APIM Platform - Kibana Configuration
+
+# 伺服器設定
+server.name: kibana
+server.host: "0.0.0.0"
+server.port: 5601
+
+# Elasticsearch 連接設定
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+
+# 監控設定
+monitoring.ui.container.elasticsearch.enabled: true
+
+# 索引設定
+kibana.index: ".kibana"
+
+# 日誌設定
+logging.level: info
+logging.appenders.file.type: file
+logging.appenders.file.fileName: /usr/share/kibana/logs/kibana.log
+logging.appenders.file.layout.type: json
+logging.root.appenders:
+  - default
+  - file
+
+# UI 設定
+i18n.locale: "zh-TW"
+
+# 安全性設定 (開發環境)
+elasticsearch.username: ""
+elasticsearch.password: ""
+
+# Telemetry 設定
+telemetry.enabled: false
+
+# 預設索引模式
+kibana.defaultAppId: "discover"
+
+# 數據視圖設定  
+data.search.timeout: 30000
+
+# 儀表板設定
+dashboard.defaultDarkMode: false
