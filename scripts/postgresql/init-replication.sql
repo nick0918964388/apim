@@ -11,3 +11,7 @@ GRANT ALL PRIVILEGES ON DATABASE kong TO kong;
 
 -- 設定 Kong 使用者為資料庫擁有者
 ALTER DATABASE kong OWNER TO kong;
+
+-- 創建 Konga 資料庫
+CREATE DATABASE konga;
+GRANT ALL PRIVILEGES ON DATABASE konga TO kong;

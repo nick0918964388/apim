@@ -88,9 +88,13 @@ class KongJWTManager {
     const payload = {
       "iss": key,
       "iat": Math.floor(Date.now() / 1000),
-      "exp": Math.floor(Date.now() / 1000) + expiresInSeconds,
       "sub": "maximo-client"
     };
+
+    // 只有當expiresInSeconds > 0時才添加exp claim
+    if (expiresInSeconds > 0) {
+      payload.exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
+    }
 
     // Base64URL編碼
     const base64URLEncode = (str) => {
@@ -117,7 +121,7 @@ class KongJWTManager {
   }
 
   // 為指定consumer生成token
-  async generateTokenForConsumer(consumerName) {
+  async generateTokenForConsumer(consumerName, expiresInSeconds = 3600) {
     try {
       const credentials = await this.getJWTCredentials(consumerName);
       if (credentials.length === 0) {
@@ -126,13 +130,20 @@ class KongJWTManager {
 
       // 使用第一個credential
       const cred = credentials[0];
-      const token = this.generateJWT(cred.key, cred.secret);
+      const token = this.generateJWT(cred.key, cred.secret, expiresInSeconds);
 
-      return {
+      const result = {
         token: token,
-        key: cred.key,
-        expiresAt: new Date(Date.now() + 3600 * 1000).toISOString()
+        key: cred.key
       };
+
+      if (expiresInSeconds > 0) {
+        result.expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
+      } else {
+        result.expiresAt = "永不過期 (Never expires)";
+      }
+
+      return result;
     } catch (error) {
       throw error;
     }
@@ -147,8 +158,17 @@ if (require.main === module) {
 
   if (command === 'generate') {
     const consumerName = process.argv[3] || 'maximo-hldev-api';
+    const expireFlag = process.argv[4];
 
-    manager.generateTokenForConsumer(consumerName)
+    // 檢查是否使用永久token
+    let expiresInSeconds = 3600; // 預設1小時
+    if (expireFlag === '--never-expire' || expireFlag === '--permanent') {
+      expiresInSeconds = 0; // 永不過期
+    } else if (expireFlag && !isNaN(expireFlag)) {
+      expiresInSeconds = parseInt(expireFlag); // 自定義秒數
+    }
+
+    manager.generateTokenForConsumer(consumerName, expiresInSeconds)
       .then(result => {
         console.log('JWT Token Generated:');
         console.log('Consumer:', consumerName);
@@ -189,13 +209,19 @@ if (require.main === module) {
     console.log('Kong JWT管理工具');
     console.log('================');
     console.log('使用方式:');
-    console.log('  node scripts/kong_jwt_manager.js generate [consumer-name]');
+    console.log('  node scripts/kong_jwt_manager.js generate [consumer-name] [expires]');
     console.log('  node scripts/kong_jwt_manager.js list');
+    console.log('');
+    console.log('Token過期選項:');
+    console.log('  --never-expire   永不過期token');
+    console.log('  --permanent      永不過期token (同上)');
+    console.log('  3600            自定義過期秒數');
+    console.log('  (預設)          1小時過期');
     console.log('');
     console.log('範例:');
     console.log('  node scripts/kong_jwt_manager.js generate maximo-hldev-api');
-    console.log('  node scripts/kong_jwt_manager.js generate maximo-test-api');
-    console.log('  node scripts/kong_jwt_manager.js generate maximo-prod-api');
+    console.log('  node scripts/kong_jwt_manager.js generate maximo-hldev-api --never-expire');
+    console.log('  node scripts/kong_jwt_manager.js generate maximo-test-api 7200');
     console.log('  node scripts/kong_jwt_manager.js list');
   }
 }

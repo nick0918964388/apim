@@ -1,0 +1,370 @@
+{
+  "performance_queries": {
+    "response_time_percentiles": {
+      "description": "獲取響應時間百分位數",
+      "query": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-1h"
+            }
+          }
+        },
+        "aggs": {
+          "response_time_percentiles": {
+            "percentiles": {
+              "field": "total_latency",
+              "percents": [50, 90, 95, 99]
+            }
+          },
+          "time_series": {
+            "date_histogram": {
+              "field": "@timestamp",
+              "fixed_interval": "5m"
+            },
+            "aggs": {
+              "p50": {
+                "percentiles": {
+                  "field": "total_latency",
+                  "percents": [50]
+                }
+              },
+              "p95": {
+                "percentiles": {
+                  "field": "total_latency",
+                  "percents": [95]
+                }
+              },
+              "p99": {
+                "percentiles": {
+                  "field": "total_latency",
+                  "percents": [99]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "sla_metrics": {
+      "description": "SLA達成率統計",
+      "query": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-24h"
+            }
+          }
+        },
+        "aggs": {
+          "availability_sla": {
+            "terms": {
+              "field": "sla_available"
+            }
+          },
+          "performance_sla": {
+            "terms": {
+              "field": "sla_performance"
+            }
+          },
+          "overall_sla": {
+            "terms": {
+              "field": "sla_met"
+            }
+          },
+          "hourly_sla": {
+            "date_histogram": {
+              "field": "@timestamp",
+              "fixed_interval": "1h"
+            },
+            "aggs": {
+              "sla_rate": {
+                "avg": {
+                  "field": "sla_met"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "latency_breakdown": {
+      "description": "延遲分解分析",
+      "query": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-1h"
+            }
+          }
+        },
+        "aggs": {
+          "kong_vs_proxy": {
+            "date_histogram": {
+              "field": "@timestamp",
+              "fixed_interval": "5m"
+            },
+            "aggs": {
+              "avg_kong_latency": {
+                "avg": {
+                  "field": "kong_latency"
+                }
+              },
+              "avg_proxy_latency": {
+                "avg": {
+                  "field": "proxy_latency",
+                  "script": {
+                    "source": "doc['proxy_latency'].value >= 0 ? doc['proxy_latency'].value : null"
+                  }
+                }
+              },
+              "avg_total_latency": {
+                "avg": {
+                  "field": "total_latency"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "service_performance": {
+      "description": "服務效能分析",
+      "query": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-4h"
+            }
+          }
+        },
+        "aggs": {
+          "services": {
+            "terms": {
+              "field": "service_name",
+              "size": 20
+            },
+            "aggs": {
+              "avg_latency": {
+                "avg": {
+                  "field": "total_latency"
+                }
+              },
+              "p95_latency": {
+                "percentiles": {
+                  "field": "total_latency",
+                  "percents": [95]
+                }
+              },
+              "avg_performance_score": {
+                "avg": {
+                  "field": "performance_score"
+                }
+              },
+              "sla_rate": {
+                "avg": {
+                  "field": "sla_met"
+                }
+              },
+              "error_rate": {
+                "filter": {
+                  "range": {
+                    "http_status": {
+                      "gte": 400
+                    }
+                  }
+                }
+              },
+              "total_requests": {
+                "value_count": {
+                  "field": "http_status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "slowest_requests": {
+      "description": "最慢請求查詢",
+      "query": {
+        "size": 20,
+        "sort": [
+          {
+            "total_latency": {
+              "order": "desc"
+            }
+          }
+        ],
+        "query": {
+          "bool": {
+            "must": [
+              {
+                "range": {
+                  "@timestamp": {
+                    "gte": "now-1h"
+                  }
+                }
+              },
+              {
+                "range": {
+                  "total_latency": {
+                    "gte": 100
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "_source": [
+          "@timestamp",
+          "service_name",
+          "route_name",
+          "total_latency",
+          "kong_latency",
+          "proxy_latency",
+          "http_status",
+          "http_method",
+          "client_address",
+          "performance_score"
+        ]
+      }
+    },
+    "performance_trends": {
+      "description": "效能趨勢分析",
+      "query": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-24h"
+            }
+          }
+        },
+        "aggs": {
+          "hourly_performance": {
+            "date_histogram": {
+              "field": "@timestamp",
+              "fixed_interval": "1h"
+            },
+            "aggs": {
+              "avg_performance_score": {
+                "avg": {
+                  "field": "performance_score"
+                }
+              },
+              "avg_response_time": {
+                "avg": {
+                  "field": "total_latency"
+                }
+              },
+              "request_count": {
+                "value_count": {
+                  "field": "@timestamp"
+                }
+              },
+              "error_count": {
+                "filter": {
+                  "range": {
+                    "http_status": {
+                      "gte": 400
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "latency_categories": {
+            "terms": {
+              "field": "latency_category.keyword"
+            }
+          }
+        }
+      }
+    },
+    "bottleneck_analysis": {
+      "description": "瓶頸分析查詢",
+      "query": {
+        "size": 0,
+        "query": {
+          "bool": {
+            "must": [
+              {
+                "range": {
+                  "@timestamp": {
+                    "gte": "now-2h"
+                  }
+                }
+              },
+              {
+                "range": {
+                  "proxy_latency": {
+                    "gte": 0
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "aggs": {
+          "kong_heavy": {
+            "filter": {
+              "script": {
+                "source": "doc['kong_latency'].value > doc['proxy_latency'].value"
+              }
+            },
+            "aggs": {
+              "services": {
+                "terms": {
+                  "field": "service_name"
+                },
+                "aggs": {
+                  "avg_kong": {
+                    "avg": {
+                      "field": "kong_latency"
+                    }
+                  },
+                  "avg_proxy": {
+                    "avg": {
+                      "field": "proxy_latency"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "proxy_heavy": {
+            "filter": {
+              "script": {
+                "source": "doc['proxy_latency'].value > doc['kong_latency'].value && doc['proxy_latency'].value > 0"
+              }
+            },
+            "aggs": {
+              "services": {
+                "terms": {
+                  "field": "service_name"
+                },
+                "aggs": {
+                  "avg_kong": {
+                    "avg": {
+                      "field": "kong_latency"
+                    }
+                  },
+                  "avg_proxy": {
+                    "avg": {
+                      "field": "proxy_latency"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

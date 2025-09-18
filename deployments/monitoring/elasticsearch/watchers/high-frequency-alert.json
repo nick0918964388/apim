@@ -1,0 +1,117 @@
+{
+  "trigger": {
+    "schedule": {
+      "interval": "1m"
+    }
+  },
+  "input": {
+    "search": {
+      "request": {
+        "search_type": "query_then_fetch",
+        "indices": ["kong-logs-current"],
+        "body": {
+          "size": 0,
+          "query": {
+            "range": {
+              "@timestamp": {
+                "gte": "now-5m"
+              }
+            }
+          },
+          "aggs": {
+            "high_frequency_users": {
+              "terms": {
+                "field": "client_address",
+                "min_doc_count": 500,
+                "size": 10
+              },
+              "aggs": {
+                "request_count": {
+                  "value_count": {
+                    "field": "@timestamp"
+                  }
+                },
+                "requests_per_minute": {
+                  "bucket_script": {
+                    "buckets_path": {
+                      "total": "request_count"
+                    },
+                    "script": "params.total / 5"
+                  }
+                },
+                "unique_routes": {
+                  "cardinality": {
+                    "field": "route_name"
+                  }
+                },
+                "error_rate": {
+                  "bucket_script": {
+                    "buckets_path": {
+                      "errors": "errors>_count",
+                      "total": "request_count"
+                    },
+                    "script": "params.total > 0 ? (params.errors / params.total * 100) : 0"
+                  }
+                },
+                "errors": {
+                  "filter": {
+                    "range": {
+                      "http_status": {
+                        "gte": 400
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "condition": {
+    "script": {
+      "source": """
+        return ctx.payload.aggregations.high_frequency_users.buckets.size() > 0;
+      """
+    }
+  },
+  "actions": {
+    "log_alert": {
+      "logging": {
+        "level": "warn",
+        "text": "檢測到高頻請求異常: {{ctx.payload.aggregations.high_frequency_users.buckets.size()}} 個IP在5分鐘內發送超過500次請求"
+      }
+    },
+    "webhook_notification": {
+      "webhook": {
+        "scheme": "http",
+        "host": "localhost",
+        "port": 8080,
+        "method": "post",
+        "path": "/alerts/high-frequency",
+        "params": {},
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "alert_type": "high_frequency_abuse",
+          "severity": "critical",
+          "message": "檢測到潛在的API濫用行為",
+          "details": {
+            "suspicious_ips": "{{#ctx.payload.aggregations.high_frequency_users.buckets}}{{key}}: {{request_count.value}}請求 ({{#script}}Math.round({{requests_per_minute.value}} * 100) / 100{{/script}}請求/分鐘), {{/ctx.payload.aggregations.high_frequency_users.buckets}}",
+            "threshold": "500請求/5分鐘",
+            "timestamp": "{{ctx.execution_time}}"
+          }
+        }
+      }
+    }
+  },
+  "metadata": {
+    "description": "監控API濫用行為，檢測在短時間內發送大量請求的IP地址",
+    "severity": "critical",
+    "category": "security",
+    "created_by": "kong-monitoring-system",
+    "version": "1.0"
+  }
+}

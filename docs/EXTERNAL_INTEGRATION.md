@@ -12,6 +12,12 @@
 - **認證**: JWT Bearer Token
 - **用途**: 取得預防性維護工單清單
 
+### Maximo人員清單API
+- **端點**: `http://your-kong-gateway:8000/api/v1/hldev/labor`
+- **方法**: GET
+- **認證**: JWT Bearer Token
+- **用途**: 取得行動應用人員清單
+
 ## 認證方式
 
 ### JWT (JSON Web Token) 認證
@@ -87,13 +93,35 @@ function generateJWT() {
   return jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256' });
 }
 
-// 調用API
+// 調用工單API
 async function getWorkOrders() {
   try {
     const token = generateJWT();
 
     const response = await axios.get(
       'http://your-kong-gateway:8000/api/v1/hldev/pm/workorders',
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('API調用失敗:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+// 調用人員清單API
+async function getLaborList() {
+  try {
+    const token = generateJWT();
+
+    const response = await axios.get(
+      'http://your-kong-gateway:8000/api/v1/hldev/labor',
       {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -153,6 +181,28 @@ def get_work_orders():
     except requests.exceptions.RequestException as e:
         print(f'API調用失敗: {e}')
         raise
+
+def get_labor_list():
+    """取得人員清單"""
+    try:
+        token = generate_jwt()
+
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        }
+
+        response = requests.get(
+            'http://your-kong-gateway:8000/api/v1/hldev/labor',
+            headers=headers
+        )
+
+        response.raise_for_status()
+        return response.json()
+
+    except requests.exceptions.RequestException as e:
+        print(f'API調用失敗: {e}')
+        raise
 ```
 
 #### cURL範例
@@ -162,7 +212,13 @@ def get_work_orders():
 # 需要先使用JWT library生成token，或聯繫管理員取得臨時token
 TOKEN="your-generated-jwt-token"
 
+# 取得工單清單
 curl -X GET "http://your-kong-gateway:8000/api/v1/hldev/pm/workorders" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json"
+
+# 取得人員清單
+curl -X GET "http://your-kong-gateway:8000/api/v1/hldev/labor" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json"
 ```

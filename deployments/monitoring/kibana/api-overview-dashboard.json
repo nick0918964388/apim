@@ -1,0 +1,350 @@
+{
+  "version": "8.11.0",
+  "objects": [
+    {
+      "id": "kong-api-overview",
+      "type": "dashboard",
+      "attributes": {
+        "title": "Kong API 概覽儀表板",
+        "description": "Kong API Gateway 概覽監控儀表板",
+        "panelsJSON": "[{\"version\":\"8.11.0\",\"gridData\":{\"x\":0,\"y\":0,\"w\":24,\"h\":15,\"i\":\"1\"},\"panelIndex\":\"1\",\"embeddableConfig\":{},\"panelRefName\":\"panel_1\"},{\"version\":\"8.11.0\",\"gridData\":{\"x\":24,\"y\":0,\"w\":24,\"h\":15,\"i\":\"2\"},\"panelIndex\":\"2\",\"embeddableConfig\":{},\"panelRefName\":\"panel_2\"},{\"version\":\"8.11.0\",\"gridData\":{\"x\":0,\"y\":15,\"w\":24,\"h\":15,\"i\":\"3\"},\"panelIndex\":\"3\",\"embeddableConfig\":{},\"panelRefName\":\"panel_3\"},{\"version\":\"8.11.0\",\"gridData\":{\"x\":24,\"y\":15,\"w\":24,\"h\":15,\"i\":\"4\"},\"panelIndex\":\"4\",\"embeddableConfig\":{},\"panelRefName\":\"panel_4\"}]",
+        "optionsJSON": "{\"useMargins\":true,\"syncColors\":false,\"hidePanelTitles\":false}",
+        "timeRestore": false,
+        "timeTo": "now",
+        "timeFrom": "now-24h",
+        "refreshInterval": {
+          "pause": false,
+          "value": 60000
+        },
+        "kibanaSavedObjectMeta": {
+          "searchSourceJSON": "{\"query\":{\"query\":\"\",\"language\":\"kuery\"},\"filter\":[]}"
+        }
+      },
+      "references": [
+        {
+          "name": "panel_1",
+          "type": "lens",
+          "id": "kong-requests-over-time"
+        },
+        {
+          "name": "panel_2",
+          "type": "lens",
+          "id": "kong-status-codes"
+        },
+        {
+          "name": "panel_3",
+          "type": "lens",
+          "id": "kong-response-times"
+        },
+        {
+          "name": "panel_4",
+          "type": "lens",
+          "id": "kong-services-breakdown"
+        }
+      ]
+    },
+    {
+      "id": "kong-requests-over-time",
+      "type": "lens",
+      "attributes": {
+        "title": "API請求趨勢",
+        "description": "每分鐘API請求數量趨勢",
+        "visualizationType": "lnsXY",
+        "state": {
+          "datasourceStates": {
+            "formBased": {
+              "layers": {
+                "layer1": {
+                  "columns": {
+                    "col1": {
+                      "dataType": "date",
+                      "isBucketed": true,
+                      "label": "@timestamp",
+                      "operationType": "date_histogram",
+                      "sourceField": "@timestamp",
+                      "params": {
+                        "interval": "auto"
+                      }
+                    },
+                    "col2": {
+                      "dataType": "number",
+                      "isBucketed": false,
+                      "label": "請求數",
+                      "operationType": "count",
+                      "sourceField": "___records___"
+                    }
+                  },
+                  "columnOrder": ["col1", "col2"]
+                }
+              }
+            }
+          },
+          "visualization": {
+            "legend": {
+              "isVisible": true,
+              "position": "right"
+            },
+            "preferredSeriesType": "line",
+            "layers": [
+              {
+                "layerId": "layer1",
+                "seriesType": "line",
+                "xAccessor": "col1",
+                "accessors": ["col2"]
+              }
+            ]
+          },
+          "query": {
+            "query": "",
+            "language": "kuery"
+          },
+          "filters": []
+        },
+        "references": [
+          {
+            "type": "index-pattern",
+            "id": "ca3fcc2f-80a2-44b1-95bf-e675d79cf4ca",
+            "name": "indexpattern-datasource-current-indexpattern"
+          },
+          {
+            "type": "index-pattern",
+            "id": "ca3fcc2f-80a2-44b1-95bf-e675d79cf4ca",
+            "name": "indexpattern-datasource-layer-layer1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kong-status-codes",
+      "type": "lens",
+      "attributes": {
+        "title": "HTTP狀態碼分布",
+        "description": "API請求HTTP狀態碼分布",
+        "visualizationType": "lnsPie",
+        "state": {
+          "datasourceStates": {
+            "formBased": {
+              "layers": {
+                "layer1": {
+                  "columns": {
+                    "col1": {
+                      "dataType": "number",
+                      "isBucketed": true,
+                      "label": "HTTP狀態碼",
+                      "operationType": "terms",
+                      "sourceField": "http_status",
+                      "params": {
+                        "size": 10,
+                        "orderBy": {
+                          "type": "column",
+                          "columnId": "col2"
+                        },
+                        "orderDirection": "desc"
+                      }
+                    },
+                    "col2": {
+                      "dataType": "number",
+                      "isBucketed": false,
+                      "label": "請求數",
+                      "operationType": "count",
+                      "sourceField": "___records___"
+                    }
+                  },
+                  "columnOrder": ["col1", "col2"]
+                }
+              }
+            }
+          },
+          "visualization": {
+            "shape": "donut",
+            "layers": [
+              {
+                "layerId": "layer1",
+                "primaryGroups": ["col1"],
+                "metrics": ["col2"],
+                "numberDisplay": "percent",
+                "categoryDisplay": "default",
+                "legendDisplay": "visible",
+                "nestedLegend": false
+              }
+            ]
+          },
+          "query": {
+            "query": "",
+            "language": "kuery"
+          },
+          "filters": []
+        },
+        "references": [
+          {
+            "type": "index-pattern",
+            "id": "ca3fcc2f-80a2-44b1-95bf-e675d79cf4ca",
+            "name": "indexpattern-datasource-current-indexpattern"
+          },
+          {
+            "type": "index-pattern",
+            "id": "ca3fcc2f-80a2-44b1-95bf-e675d79cf4ca",
+            "name": "indexpattern-datasource-layer-layer1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kong-response-times",
+      "type": "lens",
+      "attributes": {
+        "title": "響應時間分析",
+        "description": "API響應時間分布和趨勢",
+        "visualizationType": "lnsXY",
+        "state": {
+          "datasourceStates": {
+            "formBased": {
+              "layers": {
+                "layer1": {
+                  "columns": {
+                    "col1": {
+                      "dataType": "date",
+                      "isBucketed": true,
+                      "label": "@timestamp",
+                      "operationType": "date_histogram",
+                      "sourceField": "@timestamp",
+                      "params": {
+                        "interval": "auto"
+                      }
+                    },
+                    "col2": {
+                      "dataType": "number",
+                      "isBucketed": false,
+                      "label": "平均響應時間",
+                      "operationType": "average",
+                      "sourceField": "total_latency"
+                    },
+                    "col3": {
+                      "dataType": "number",
+                      "isBucketed": false,
+                      "label": "P95響應時間",
+                      "operationType": "percentile",
+                      "sourceField": "total_latency",
+                      "params": {
+                        "percentile": 95
+                      }
+                    }
+                  },
+                  "columnOrder": ["col1", "col2", "col3"]
+                }
+              }
+            }
+          },
+          "visualization": {
+            "legend": {
+              "isVisible": true,
+              "position": "right"
+            },
+            "preferredSeriesType": "line",
+            "layers": [
+              {
+                "layerId": "layer1",
+                "seriesType": "line",
+                "xAccessor": "col1",
+                "accessors": ["col2", "col3"]
+              }
+            ]
+          },
+          "query": {
+            "query": "",
+            "language": "kuery"
+          },
+          "filters": []
+        },
+        "references": [
+          {
+            "type": "index-pattern",
+            "id": "ca3fcc2f-80a2-44b1-95bf-e675d79cf4ca",
+            "name": "indexpattern-datasource-current-indexpattern"
+          },
+          {
+            "type": "index-pattern",
+            "id": "ca3fcc2f-80a2-44b1-95bf-e675d79cf4ca",
+            "name": "indexpattern-datasource-layer-layer1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "kong-services-breakdown",
+      "type": "lens",
+      "attributes": {
+        "title": "服務請求分布",
+        "description": "各服務的請求數量分布",
+        "visualizationType": "lnsXY",
+        "state": {
+          "datasourceStates": {
+            "formBased": {
+              "layers": {
+                "layer1": {
+                  "columns": {
+                    "col1": {
+                      "dataType": "string",
+                      "isBucketed": true,
+                      "label": "服務名稱",
+                      "operationType": "terms",
+                      "sourceField": "service_name",
+                      "params": {
+                        "size": 10,
+                        "orderBy": {
+                          "type": "column",
+                          "columnId": "col2"
+                        },
+                        "orderDirection": "desc"
+                      }
+                    },
+                    "col2": {
+                      "dataType": "number",
+                      "isBucketed": false,
+                      "label": "請求數",
+                      "operationType": "count",
+                      "sourceField": "___records___"
+                    }
+                  },
+                  "columnOrder": ["col1", "col2"]
+                }
+              }
+            }
+          },
+          "visualization": {
+            "legend": {
+              "isVisible": true,
+              "position": "right"
+            },
+            "preferredSeriesType": "bar_horizontal",
+            "layers": [
+              {
+                "layerId": "layer1",
+                "seriesType": "bar_horizontal",
+                "xAccessor": "col2",
+                "splitAccessor": "col1"
+              }
+            ]
+          },
+          "query": {
+            "query": "",
+            "language": "kuery"
+          },
+          "filters": []
+        },
+        "references": [
+          {
+            "type": "index-pattern",
+            "id": "ca3fcc2f-80a2-44b1-95bf-e675d79cf4ca",
+            "name": "indexpattern-datasource-current-indexpattern"
+          },
+          {
+            "type": "index-pattern",
+            "id": "ca3fcc2f-80a2-44b1-95bf-e675d79cf4ca",
+            "name": "indexpattern-datasource-layer-layer1"
+          }
+        ]
+      }
+    }
+  ]
+}

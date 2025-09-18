@@ -1,0 +1,115 @@
+{
+  "trigger": {
+    "schedule": {
+      "interval": "5m"
+    }
+  },
+  "input": {
+    "search": {
+      "request": {
+        "search_type": "query_then_fetch",
+        "indices": ["kong-logs-current"],
+        "body": {
+          "size": 0,
+          "query": {
+            "range": {
+              "@timestamp": {
+                "gte": "now-5m"
+              }
+            }
+          },
+          "aggs": {
+            "total_requests": {
+              "value_count": {
+                "field": "@timestamp"
+              }
+            },
+            "error_requests": {
+              "filter": {
+                "range": {
+                  "http_status": {
+                    "gte": 400
+                  }
+                }
+              }
+            },
+            "error_breakdown": {
+              "filters": {
+                "filters": {
+                  "4xx_errors": {
+                    "range": {
+                      "http_status": {
+                        "gte": 400,
+                        "lt": 500
+                      }
+                    }
+                  },
+                  "5xx_errors": {
+                    "range": {
+                      "http_status": {
+                        "gte": 500
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "condition": {
+    "script": {
+      "source": """
+        def total = ctx.payload.aggregations.total_requests.value;
+        def errors = ctx.payload.aggregations.error_requests.doc_count;
+        if (total == 0) return false;
+        def error_rate = (errors / total) * 100;
+        return error_rate > 10;
+      """
+    }
+  },
+  "actions": {
+    "log_error": {
+      "logging": {
+        "level": "error",
+        "text": "Kong API錯誤率告警: 錯誤率過高 - {{ctx.payload.aggregations.error_requests.doc_count}}/{{ctx.payload.aggregations.total_requests.value}}"
+      }
+    },
+    "webhook_notification": {
+      "webhook": {
+        "scheme": "http",
+        "host": "localhost",
+        "port": 8080,
+        "method": "post",
+        "path": "/alerts/error-rate",
+        "params": {},
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "alert_type": "error_rate",
+          "severity": "critical",
+          "message": "Kong API錯誤率過高",
+          "details": {
+            "total_requests": "{{ctx.payload.aggregations.total_requests.value}}",
+            "error_requests": "{{ctx.payload.aggregations.error_requests.doc_count}}",
+            "error_rate_percent": "{{#script}}Math.round((ctx.payload.aggregations.error_requests.doc_count / ctx.payload.aggregations.total_requests.value) * 100 * 100) / 100{{/script}}",
+            "4xx_errors": "{{ctx.payload.aggregations.error_breakdown.buckets.4xx_errors.doc_count}}",
+            "5xx_errors": "{{ctx.payload.aggregations.error_breakdown.buckets.5xx_errors.doc_count}}",
+            "threshold_percent": 10,
+            "timestamp": "{{ctx.execution_time}}"
+          }
+        }
+      }
+    }
+  },
+  "metadata": {
+    "description": "監控Kong API錯誤率，當5分鐘內錯誤率超過10%時觸發告警",
+    "severity": "critical",
+    "category": "availability",
+    "created_by": "kong-monitoring-system",
+    "version": "1.0"
+  }
+}

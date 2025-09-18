@@ -33,36 +33,50 @@ services:
       start_period: 60s
     restart: unless-stopped
 
-  # PostgreSQL Slave Database (Temporarily Disabled - Needs Fix)
-  # kong-database-slave:
-  #   image: postgres:13
-  #   container_name: kong-database-slave
-  #   user: postgres
-  #   environment:
-  #     PGUSER: ${POSTGRES_USER}
-  #     PGPASSWORD: ${POSTGRES_PASSWORD}
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-  #     POSTGRES_MASTER_SERVICE: kong-database-master
-  #     POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER}
-  #     POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD}
-  #   ports:
-  #     - "5433:5432"
-  #   volumes:
-  #     - postgres-slave-data:/var/lib/postgresql/data
-  #     - ../../config/postgresql/slave/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-  #     - ../../config/postgresql/slave/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-  #   networks:
-  #     - kong-net
-  #   depends_on:
-  #     kong-database-master:
-  #       condition: service_healthy
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 120s
-  #   restart: unless-stopped
+  # PostgreSQL Slave Database
+  kong-database-slave:
+    image: postgres:13
+    container_name: kong-database-slave
+    environment:
+      PGUSER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_MASTER_SERVICE: kong-database-master
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-slave-data:/var/lib/postgresql/data
+      - postgres-wal-archive:/var/lib/postgresql/wal_archive
+      - ../../config/postgresql/slave/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ../../config/postgresql/slave/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ../../scripts/postgresql/setup-slave.sh:/setup-slave.sh:ro
+    command: >
+      bash -c "
+      if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+        echo 'Initializing slave from master...';
+        rm -rf /var/lib/postgresql/data/*;
+        PGPASSWORD='${POSTGRES_REPLICATION_PASSWORD}' pg_basebackup -h kong-database-master -p 5432 -U ${POSTGRES_REPLICATION_USER} -D /var/lib/postgresql/data -Fp -Xs -P -R -v;
+        touch /var/lib/postgresql/data/standby.signal;
+        echo \"primary_conninfo = 'host=kong-database-master port=5432 user=${POSTGRES_REPLICATION_USER} password=${POSTGRES_REPLICATION_PASSWORD} application_name=slave1'\" >> /var/lib/postgresql/data/postgresql.auto.conf;
+        echo \"primary_slot_name = 'slave1_slot'\" >> /var/lib/postgresql/data/postgresql.auto.conf;
+        chown -R postgres:postgres /var/lib/postgresql/data;
+        chmod 700 /var/lib/postgresql/data;
+      fi;
+      exec docker-entrypoint.sh postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf
+      "
+    networks:
+      - kong-net
+    depends_on:
+      kong-database-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    restart: unless-stopped
 
   # Elasticsearch
   elasticsearch:
@@ -155,6 +169,8 @@ services:
       - "8001:8001"
       - "8443:8443"
       - "8444:8444"
+    volumes:
+      - /home/nickyin/srv/apim/logs:/tmp/kong-logs
     networks:
       - kong-net
     depends_on:
@@ -188,6 +204,7 @@ services:
       kong-database-master:
         condition: service_healthy
     restart: "no"
+
 
   # Backup Service
   kong-backup:

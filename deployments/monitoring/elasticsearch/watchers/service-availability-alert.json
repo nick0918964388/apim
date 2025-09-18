@@ -1,0 +1,144 @@
+{
+  "trigger": {
+    "schedule": {
+      "interval": "2m"
+    }
+  },
+  "input": {
+    "search": {
+      "request": {
+        "search_type": "query_then_fetch",
+        "indices": ["kong-logs-current"],
+        "body": {
+          "size": 0,
+          "query": {
+            "range": {
+              "@timestamp": {
+                "gte": "now-10m"
+              }
+            }
+          },
+          "aggs": {
+            "services": {
+              "terms": {
+                "field": "service_name",
+                "size": 20
+              },
+              "aggs": {
+                "total_requests": {
+                  "value_count": {
+                    "field": "@timestamp"
+                  }
+                },
+                "successful_requests": {
+                  "filter": {
+                    "range": {
+                      "http_status": {
+                        "lt": 400
+                      }
+                    }
+                  }
+                },
+                "error_requests": {
+                  "filter": {
+                    "range": {
+                      "http_status": {
+                        "gte": 400
+                      }
+                    }
+                  }
+                },
+                "availability_rate": {
+                  "bucket_script": {
+                    "buckets_path": {
+                      "successful": "successful_requests>_count",
+                      "total": "total_requests"
+                    },
+                    "script": "params.total > 0 ? (params.successful / params.total * 100) : 0"
+                  }
+                },
+                "last_request": {
+                  "max": {
+                    "field": "@timestamp"
+                  }
+                },
+                "minutes_since_last_request": {
+                  "bucket_script": {
+                    "buckets_path": {
+                      "last": "last_request"
+                    },
+                    "script": "(System.currentTimeMillis() - params.last) / 60000"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "condition": {
+    "script": {
+      "source": """
+        def alerts = [];
+        for (bucket in ctx.payload.aggregations.services.buckets) {
+          def availability = bucket.availability_rate.value;
+          def minutesSince = bucket.minutes_since_last_request.value;
+          def totalRequests = bucket.total_requests.value;
+
+          // Service down: no requests in last 5 minutes
+          if (minutesSince > 5 && totalRequests < 5) {
+            alerts.add("Service " + bucket.key + " appears down - no activity for " + minutesSince + " minutes");
+          }
+
+          // Low availability: less than 95% success rate with significant traffic
+          if (availability < 95 && totalRequests > 10) {
+            alerts.add("Service " + bucket.key + " low availability: " + availability + "%");
+          }
+        }
+
+        ctx.vars.alerts = alerts;
+        return alerts.size() > 0;
+      """
+    }
+  },
+  "actions": {
+    "log_alert": {
+      "logging": {
+        "level": "error",
+        "text": "服務可用性告警: {{#ctx.vars.alerts}}{{.}}, {{/ctx.vars.alerts}}"
+      }
+    },
+    "webhook_notification": {
+      "webhook": {
+        "scheme": "http",
+        "host": "localhost",
+        "port": 8080,
+        "method": "post",
+        "path": "/alerts/service-availability",
+        "params": {},
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "alert_type": "service_availability",
+          "severity": "critical",
+          "message": "服務可用性異常",
+          "details": {
+            "affected_services": "{{#ctx.payload.aggregations.services.buckets}}{{#script}}if({{availability_rate.value}} < 95 || {{minutes_since_last_request.value}} > 5) '{{key}}: ' + {{availability_rate.value}} + '% 可用性'{{/script}}, {{/ctx.payload.aggregations.services.buckets}}",
+            "availability_threshold": "95%",
+            "downtime_threshold": "5分鐘無活動",
+            "timestamp": "{{ctx.execution_time}}"
+          }
+        }
+      }
+    }
+  },
+  "metadata": {
+    "description": "監控服務可用性，檢測服務停機或高錯誤率情況",
+    "severity": "critical",
+    "category": "availability",
+    "created_by": "kong-monitoring-system",
+    "version": "1.0"
+  }
+}

@@ -3,9 +3,27 @@
   "template": {
     "settings": {
       "number_of_shards": 1,
-      "number_of_replicas": 0,
+      "number_of_replicas": 1,
       "index.refresh_interval": "5s",
-      "index.mapping.total_fields.limit": 2000
+      "index.mapping.total_fields.limit": 2000,
+      "index.lifecycle.name": "kong-logs-policy",
+      "index.lifecycle.rollover_alias": "kong-api-logs",
+      "index.max_result_window": 10000,
+      "index.query.default_field": [
+        "service_name",
+        "route_name",
+        "http_method",
+        "user_agent",
+        "client_address"
+      ],
+      "analysis": {
+        "analyzer": {
+          "url_analyzer": {
+            "tokenizer": "uax_url_email",
+            "filter": ["lowercase"]
+          }
+        }
+      }
     },
     "mappings": {
       "properties": {
@@ -75,10 +93,12 @@
               "type": "integer"
             },
             "querystring": {
-              "type": "object"
+              "type": "object",
+              "enabled": false
             },
             "headers": {
-              "type": "object"
+              "type": "object",
+              "enabled": false
             }
           }
         },
@@ -91,7 +111,8 @@
               "type": "integer"
             },
             "headers": {
-              "type": "object"
+              "type": "object",
+              "enabled": false
             }
           }
         },

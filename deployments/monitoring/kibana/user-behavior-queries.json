@@ -1,0 +1,549 @@
+{
+  "user_behavior_queries": {
+    "active_users_summary": {
+      "description": "活躍用戶概要統計",
+      "query": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-24h"
+            }
+          }
+        },
+        "aggs": {
+          "users": {
+            "terms": {
+              "field": "client_address",
+              "size": 100,
+              "order": {
+                "request_count": "desc"
+              }
+            },
+            "aggs": {
+              "request_count": {
+                "value_count": {
+                  "field": "@timestamp"
+                }
+              },
+              "first_request": {
+                "min": {
+                  "field": "@timestamp"
+                }
+              },
+              "last_request": {
+                "max": {
+                  "field": "@timestamp"
+                }
+              },
+              "session_duration_minutes": {
+                "bucket_script": {
+                  "buckets_path": {
+                    "first": "first_request",
+                    "last": "last_request"
+                  },
+                  "script": "(params.last - params.first) / 60000"
+                }
+              },
+              "unique_services": {
+                "cardinality": {
+                  "field": "service_name"
+                }
+              },
+              "unique_routes": {
+                "cardinality": {
+                  "field": "route_name"
+                }
+              },
+              "error_count": {
+                "filter": {
+                  "range": {
+                    "http_status": {
+                      "gte": 400
+                    }
+                  }
+                }
+              },
+              "error_rate": {
+                "bucket_script": {
+                  "buckets_path": {
+                    "errors": "error_count>_count",
+                    "total": "request_count"
+                  },
+                  "script": "params.total > 0 ? (params.errors / params.total * 100) : 0"
+                }
+              },
+              "avg_response_time": {
+                "avg": {
+                  "field": "total_latency"
+                }
+              },
+              "top_user_agent": {
+                "terms": {
+                  "field": "user_agent.keyword",
+                  "size": 1
+                }
+              },
+              "geography": {
+                "terms": {
+                  "field": "geoip.country_name",
+                  "size": 5
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "geographic_distribution": {
+      "description": "地理分布分析",
+      "query": {
+        "size": 0,
+        "query": {
+          "bool": {
+            "must": [
+              {
+                "range": {
+                  "@timestamp": {
+                    "gte": "now-7d"
+                  }
+                }
+              },
+              {
+                "exists": {
+                  "field": "geoip.country_name"
+                }
+              }
+            ]
+          }
+        },
+        "aggs": {
+          "countries": {
+            "terms": {
+              "field": "geoip.country_name",
+              "size": 20
+            },
+            "aggs": {
+              "cities": {
+                "terms": {
+                  "field": "geoip.city_name",
+                  "size": 10
+                }
+              },
+              "unique_users": {
+                "cardinality": {
+                  "field": "client_address"
+                }
+              },
+              "total_requests": {
+                "value_count": {
+                  "field": "@timestamp"
+                }
+              },
+              "coordinates": {
+                "geo_centroid": {
+                  "field": "geoip.location"
+                }
+              }
+            }
+          },
+          "geographic_diversity": {
+            "cardinality": {
+              "field": "geoip.country_name"
+            }
+          }
+        }
+      }
+    },
+    "user_agent_analysis": {
+      "description": "用戶代理和設備分析",
+      "query": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-24h"
+            }
+          }
+        },
+        "aggs": {
+          "browsers": {
+            "terms": {
+              "field": "user_agent_parsed.name",
+              "size": 15
+            },
+            "aggs": {
+              "versions": {
+                "terms": {
+                  "field": "user_agent_parsed.version",
+                  "size": 5
+                }
+              },
+              "unique_users": {
+                "cardinality": {
+                  "field": "client_address"
+                }
+              }
+            }
+          },
+          "operating_systems": {
+            "terms": {
+              "field": "user_agent_parsed.os",
+              "size": 10
+            },
+            "aggs": {
+              "unique_users": {
+                "cardinality": {
+                  "field": "client_address"
+                }
+              }
+            }
+          },
+          "devices": {
+            "terms": {
+              "field": "user_agent_parsed.device",
+              "size": 10
+            },
+            "aggs": {
+              "unique_users": {
+                "cardinality": {
+                  "field": "client_address"
+                }
+              }
+            }
+          },
+          "raw_user_agents": {
+            "terms": {
+              "field": "user_agent.keyword",
+              "size": 20
+            },
+            "aggs": {
+              "unique_users": {
+                "cardinality": {
+                  "field": "client_address"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "usage_patterns": {
+      "description": "使用模式分析",
+      "query": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-7d"
+            }
+          }
+        },
+        "aggs": {
+          "hourly_activity": {
+            "date_histogram": {
+              "field": "@timestamp",
+              "calendar_interval": "hour"
+            },
+            "aggs": {
+              "unique_users": {
+                "cardinality": {
+                  "field": "client_address"
+                }
+              },
+              "requests_per_user": {
+                "bucket_script": {
+                  "buckets_path": {
+                    "total_requests": "_count",
+                    "unique_users": "unique_users"
+                  },
+                  "script": "params.unique_users > 0 ? params.total_requests / params.unique_users : 0"
+                }
+              }
+            }
+          },
+          "daily_activity": {
+            "date_histogram": {
+              "field": "@timestamp",
+              "calendar_interval": "day"
+            },
+            "aggs": {
+              "unique_users": {
+                "cardinality": {
+                  "field": "client_address"
+                }
+              },
+              "returning_users": {
+                "bucket_script": {
+                  "buckets_path": {
+                    "today": "unique_users"
+                  },
+                  "script": "params.today"
+                }
+              }
+            }
+          },
+          "service_popularity": {
+            "terms": {
+              "field": "service_name",
+              "size": 10
+            },
+            "aggs": {
+              "unique_users": {
+                "cardinality": {
+                  "field": "client_address"
+                }
+              },
+              "routes": {
+                "terms": {
+                  "field": "route_name",
+                  "size": 5
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "anomaly_detection": {
+      "description": "異常行為檢測",
+      "query": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-1h"
+            }
+          }
+        },
+        "aggs": {
+          "high_frequency_users": {
+            "terms": {
+              "field": "client_address",
+              "min_doc_count": 100,
+              "size": 20
+            },
+            "aggs": {
+              "request_count": {
+                "value_count": {
+                  "field": "@timestamp"
+                }
+              },
+              "requests_per_minute": {
+                "bucket_script": {
+                  "buckets_path": {
+                    "total": "request_count"
+                  },
+                  "script": "params.total / 60"
+                }
+              },
+              "unique_routes": {
+                "cardinality": {
+                  "field": "route_name"
+                }
+              },
+              "error_rate": {
+                "bucket_script": {
+                  "buckets_path": {
+                    "errors": "errors>_count",
+                    "total": "request_count"
+                  },
+                  "script": "params.total > 0 ? (params.errors / params.total * 100) : 0"
+                }
+              },
+              "errors": {
+                "filter": {
+                  "range": {
+                    "http_status": {
+                      "gte": 400
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "suspicious_patterns": {
+            "composite": {
+              "sources": [
+                {
+                  "ip": {
+                    "terms": {
+                      "field": "client_address"
+                    }
+                  }
+                }
+              ],
+              "size": 100
+            },
+            "aggs": {
+              "countries": {
+                "cardinality": {
+                  "field": "geoip.country_name"
+                }
+              },
+              "user_agents": {
+                "cardinality": {
+                  "field": "user_agent.keyword"
+                }
+              },
+              "request_count": {
+                "value_count": {
+                  "field": "@timestamp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "session_analysis": {
+      "description": "用戶會話分析",
+      "query": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-24h"
+            }
+          }
+        },
+        "aggs": {
+          "user_sessions": {
+            "terms": {
+              "field": "client_address",
+              "size": 500
+            },
+            "aggs": {
+              "session_start": {
+                "min": {
+                  "field": "@timestamp"
+                }
+              },
+              "session_end": {
+                "max": {
+                  "field": "@timestamp"
+                }
+              },
+              "session_duration_minutes": {
+                "bucket_script": {
+                  "buckets_path": {
+                    "start": "session_start",
+                    "end": "session_end"
+                  },
+                  "script": "(params.end - params.start) / 60000"
+                }
+              },
+              "request_frequency": {
+                "bucket_script": {
+                  "buckets_path": {
+                    "requests": "_count",
+                    "duration": "session_duration_minutes"
+                  },
+                  "script": "params.duration > 0 ? params.requests / (params.duration / 60) : 0"
+                }
+              },
+              "timeline": {
+                "date_histogram": {
+                  "field": "@timestamp",
+                  "fixed_interval": "5m"
+                }
+              }
+            }
+          },
+          "session_duration_distribution": {
+            "histogram": {
+              "script": {
+                "source": """
+                  def sessions = [:];
+                  for (hit in params._source) {
+                    def ip = hit._source.client_address;
+                    if (!sessions.containsKey(ip)) {
+                      sessions[ip] = ['start': hit._source['@timestamp'], 'end': hit._source['@timestamp']];
+                    } else {
+                      if (hit._source['@timestamp'] < sessions[ip].start) {
+                        sessions[ip].start = hit._source['@timestamp'];
+                      }
+                      if (hit._source['@timestamp'] > sessions[ip].end) {
+                        sessions[ip].end = hit._source['@timestamp'];
+                      }
+                    }
+                  }
+                  return (sessions[params._source[0]._source.client_address].end - sessions[params._source[0]._source.client_address].start) / 60000;
+                """
+              },
+              "interval": 10
+            }
+          }
+        }
+      }
+    },
+    "user_loyalty": {
+      "description": "用戶忠誠度分析",
+      "query": {
+        "size": 0,
+        "query": {
+          "range": {
+            "@timestamp": {
+              "gte": "now-30d"
+            }
+          }
+        },
+        "aggs": {
+          "user_activity_days": {
+            "terms": {
+              "field": "client_address",
+              "size": 1000
+            },
+            "aggs": {
+              "active_days": {
+                "cardinality": {
+                  "field": "@timestamp",
+                  "precision_threshold": 1000
+                }
+              },
+              "first_seen": {
+                "min": {
+                  "field": "@timestamp"
+                }
+              },
+              "last_seen": {
+                "max": {
+                  "field": "@timestamp"
+                }
+              },
+              "total_requests": {
+                "value_count": {
+                  "field": "@timestamp"
+                }
+              }
+            }
+          },
+          "loyalty_segments": {
+            "range": {
+              "script": {
+                "source": """
+                  def now = System.currentTimeMillis();
+                  def firstSeen = doc['@timestamp'].value.millis;
+                  return (now - firstSeen) / (24 * 60 * 60 * 1000);
+                """
+              },
+              "ranges": [
+                {"key": "new_users", "to": 1},
+                {"key": "recent_users", "from": 1, "to": 7},
+                {"key": "regular_users", "from": 7, "to": 30},
+                {"key": "loyal_users", "from": 30}
+              ]
+            },
+            "aggs": {
+              "unique_users": {
+                "cardinality": {
+                  "field": "client_address"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

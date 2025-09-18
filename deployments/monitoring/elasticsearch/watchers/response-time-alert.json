@@ -1,0 +1,90 @@
+{
+  "trigger": {
+    "schedule": {
+      "interval": "5m"
+    }
+  },
+  "input": {
+    "search": {
+      "request": {
+        "search_type": "query_then_fetch",
+        "indices": ["kong-logs-current"],
+        "body": {
+          "size": 0,
+          "query": {
+            "range": {
+              "@timestamp": {
+                "gte": "now-5m"
+              }
+            }
+          },
+          "aggs": {
+            "p95_response_time": {
+              "percentiles": {
+                "field": "total_latency",
+                "percents": [95]
+              }
+            },
+            "avg_response_time": {
+              "avg": {
+                "field": "total_latency"
+              }
+            },
+            "request_count": {
+              "value_count": {
+                "field": "@timestamp"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "condition": {
+    "compare": {
+      "ctx.payload.aggregations.p95_response_time.values.95\\.0": {
+        "gt": 2000
+      }
+    }
+  },
+  "actions": {
+    "log_error": {
+      "logging": {
+        "level": "error",
+        "text": "Kong API響應時間告警: P95響應時間 {{ctx.payload.aggregations.p95_response_time.values.95.0}}ms 超過2000ms閾值"
+      }
+    },
+    "webhook_notification": {
+      "webhook": {
+        "scheme": "http",
+        "host": "localhost",
+        "port": 8080,
+        "method": "post",
+        "path": "/alerts/response-time",
+        "params": {},
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "alert_type": "response_time",
+          "severity": "warning",
+          "message": "Kong API P95響應時間過高",
+          "details": {
+            "p95_response_time": "{{ctx.payload.aggregations.p95_response_time.values.95.0}}",
+            "avg_response_time": "{{ctx.payload.aggregations.avg_response_time.value}}",
+            "request_count": "{{ctx.payload.aggregations.request_count.value}}",
+            "threshold": 2000,
+            "timestamp": "{{ctx.execution_time}}"
+          }
+        }
+      }
+    }
+  },
+  "metadata": {
+    "description": "監控Kong API響應時間，當P95超過2秒時觸發告警",
+    "severity": "warning",
+    "category": "performance",
+    "created_by": "kong-monitoring-system",
+    "version": "1.0"
+  }
+}

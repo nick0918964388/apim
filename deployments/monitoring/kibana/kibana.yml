@@ -13,32 +13,28 @@ elasticsearch.hosts: ["http://elasticsearch:9200"]
 monitoring.ui.container.elasticsearch.enabled: true
 
 # 索引設定
-kibana.index: ".kibana"
+# kibana.index: ".kibana"  # Deprecated in Kibana 8.x
 
 # 日誌設定
-logging.root.level: info
-logging.appenders.file.type: file
-logging.appenders.file.fileName: /usr/share/kibana/logs/kibana.log
-logging.appenders.file.layout.type: json
-logging.root.appenders:
-  - default
-  - file
+logging:
+  root:
+    level: info
 
 # UI 設定
 i18n.locale: "zh-TW"
 
-# 安全性設定 (開發環境)
-elasticsearch.username: ""
-elasticsearch.password: ""
+# 安全性設定 (開發環境 - 已關閉)
+# elasticsearch.username: ""
+# elasticsearch.password: ""
 
 # Telemetry 設定
 telemetry.enabled: false
 
 # 預設索引模式
-kibana.defaultAppId: "discover"
+# kibana.defaultAppId: "discover"
 
-# 數據視圖設定  
-data.search.timeout: 30000
+# 數據視圖設定
+# data.search.timeout: 30000  # Deprecated in Kibana 8.x
 
 # 儀表板設定
-dashboard.defaultDarkMode: false
+# dashboard.defaultDarkMode: false  # Deprecated in Kibana 8.x
