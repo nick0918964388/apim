@@ -33,46 +33,36 @@ services:
       start_period: 60s
     restart: unless-stopped
 
-  # PostgreSQL Slave Database  
-  kong-database-slave:
-    image: postgres:13
-    container_name: kong-database-slave
-    environment:
-      PGUSER: ${POSTGRES_USER}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_MASTER_SERVICE: kong-database-master
-      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER}
-      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD}
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres-slave-data:/var/lib/postgresql/data
-      - ../../config/postgresql/slave/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-      - ../../config/postgresql/slave/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-      - ./scripts/setup-slave.sh:/docker-entrypoint-initdb.d/setup-slave.sh:ro
-    command: >
-      bash -c "
-      if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
-        echo 'Setting up PostgreSQL slave...'
-        PGPASSWORD=${POSTGRES_REPLICATION_PASSWORD} pg_basebackup -h kong-database-master -D /var/lib/postgresql/data -U ${POSTGRES_REPLICATION_USER} -W -v -P
-        echo 'primary_conninfo = ''host=kong-database-master port=5432 user=${POSTGRES_REPLICATION_USER} password=${POSTGRES_REPLICATION_PASSWORD}''' >> /var/lib/postgresql/data/postgresql.auto.conf
-        echo 'standby_mode = on' > /var/lib/postgresql/data/standby.signal
-      fi
-      postgres -c config_file=/etc/postgresql/postgresql.conf -c hba_file=/etc/postgresql/pg_hba.conf
-      "
-    networks:
-      - kong-net
-    depends_on:
-      kong-database-master:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 120s
-    restart: unless-stopped
+  # PostgreSQL Slave Database (Temporarily Disabled - Needs Fix)
+  # kong-database-slave:
+  #   image: postgres:13
+  #   container_name: kong-database-slave
+  #   user: postgres
+  #   environment:
+  #     PGUSER: ${POSTGRES_USER}
+  #     PGPASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_MASTER_SERVICE: kong-database-master
+  #     POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER}
+  #     POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD}
+  #   ports:
+  #     - "5433:5432"
+  #   volumes:
+  #     - postgres-slave-data:/var/lib/postgresql/data
+  #     - ../../config/postgresql/slave/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+  #     - ../../config/postgresql/slave/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+  #   networks:
+  #     - kong-net
+  #   depends_on:
+  #     kong-database-master:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 120s
+  #   restart: unless-stopped
 
   # Elasticsearch
   elasticsearch:
@@ -144,7 +134,7 @@ services:
 
   # Kong Gateway
   kong:
-    image: kong:3.8-alpine
+    image: kong:alpine
     container_name: kong
     environment:
       KONG_DATABASE: ${KONG_DATABASE}
@@ -165,8 +155,6 @@ services:
       - "8001:8001"
       - "8443:8443"
       - "8444:8444"
-    volumes:
-      - ../../config/kong/kong.conf:/etc/kong/kong.conf:ro
     networks:
       - kong-net
     depends_on:
@@ -184,7 +172,7 @@ services:
 
   # Kong Bootstrap (Database Migration)
   kong-migration:
-    image: kong:3.8-alpine
+    image: kong:alpine
     container_name: kong-migration
     environment:
       KONG_DATABASE: ${KONG_DATABASE}
@@ -216,13 +204,14 @@ services:
       - ../../scripts/backup:/scripts:ro
     command: >
       bash -c "
-      echo 'Backup service starting...'
-      # 設定 crontab 進行定期備份
-      echo '0 2 * * * /scripts/full_backup.sh' > /var/spool/cron/crontabs/root
-      echo '0 * * * * /scripts/incremental_backup.sh' >> /var/spool/cron/crontabs/root
-      chmod 0600 /var/spool/cron/crontabs/root
-      # 啟動 cron 服務
-      cron -f
+      echo 'Backup service starting...';
+      apt-get update && apt-get install -y cron;
+      echo '0 2 * * * /scripts/full_backup.sh' > /tmp/crontab;
+      echo '0 * * * * /scripts/incremental_backup.sh' >> /tmp/crontab;
+      crontab /tmp/crontab;
+      service cron start;
+      echo 'Cron service started. Monitoring logs...';
+      tail -f /dev/null
       "
     networks:
       - kong-net

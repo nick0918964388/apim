@@ -16,7 +16,7 @@ monitoring.ui.container.elasticsearch.enabled: true
 kibana.index: ".kibana"
 
 # 日誌設定
-logging.level: info
+logging.root.level: info
 logging.appenders.file.type: file
 logging.appenders.file.fileName: /usr/share/kibana/logs/kibana.log
 logging.appenders.file.layout.type: json
